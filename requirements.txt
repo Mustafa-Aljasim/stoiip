@@ -9,4 +9,3 @@ openpyxl
 html
 io
 math
-reportlab.lib 
