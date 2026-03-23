@@ -6,3 +6,7 @@ scipy
 seaborn
 plotly
 openpyxl
+html
+io
+math
+reportlab.lib 
