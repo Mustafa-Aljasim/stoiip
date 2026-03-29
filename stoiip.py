@@ -106,6 +106,32 @@ def sample_from_uniforms(dist_name, p1, p2, p3, u):
     raise ValueError(f"Unsupported distribution: {dist_name}")
 
 
+def create_cumulative_plot(values, stats, xlabel, title):
+    """Build an empirical cumulative distribution plot."""
+    sorted_values = np.sort(np.asarray(values, dtype=float))
+    cumulative_probability = np.arange(1, len(sorted_values) + 1) / len(sorted_values) * 100.0
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    ax.plot(sorted_values, cumulative_probability, linewidth=2.0, color="#1f77b4")
+    ax.scatter(
+        [stats["P90"], stats["P50"], stats["P10"]],
+        [10, 50, 90],
+        color="#d62728",
+        zorder=3,
+        label="P90 / P50 / P10",
+    )
+    ax.axvline(stats["P90"], linestyle="--", linewidth=1.2, color="#ff7f0e", label=f"P90 = {stats['P90']:,.2f}")
+    ax.axvline(stats["P50"], linestyle="--", linewidth=1.2, color="#2ca02c", label=f"P50 = {stats['P50']:,.2f}")
+    ax.axvline(stats["P10"], linestyle="--", linewidth=1.2, color="#9467bd", label=f"P10 = {stats['P10']:,.2f}")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel("Cumulative Probability (%)")
+    ax.set_title(title)
+    ax.set_ylim(0, 100)
+    ax.grid(alpha=0.25)
+    ax.legend()
+    return fig
+
+
 # -----------------------------
 # UI helpers
 # -----------------------------
@@ -259,6 +285,12 @@ with st.sidebar:
     use_correlation = st.checkbox("Enable input correlation", value=True)
     run_button = st.button("Run simulation")
 
+if "run_simulation" not in st.session_state:
+    st.session_state["run_simulation"] = False
+
+if run_button:
+    st.session_state["run_simulation"] = True
+
 
 # -----------------------------
 # Inputs
@@ -294,7 +326,7 @@ if use_correlation:
 # -----------------------------
 # Run simulation
 # -----------------------------
-if run_button:
+if st.session_state["run_simulation"]:
     if not all_ok or not corr_ok:
         st.stop()
 
@@ -393,9 +425,21 @@ if run_button:
     ax1.legend()
     st.pyplot(fig1)
 
+    st.subheader("STOIIP cumulative distribution")
+    fig1_cum = create_cumulative_plot(
+        stoiip_mmstb,
+        stoiip_stats,
+        "STOIIP (MMSTB)",
+        "Cumulative STOIIP Results",
+    )
+    st.pyplot(fig1_cum)
+
     stoiip_img = io.BytesIO()
     fig1.savefig(stoiip_img, format="png", bbox_inches="tight")
     stoiip_img_b64 = base64.b64encode(stoiip_img.getvalue()).decode("utf-8")
+    stoiip_cum_img = io.BytesIO()
+    fig1_cum.savefig(stoiip_cum_img, format="png", bbox_inches="tight")
+    stoiip_cum_img_b64 = base64.b64encode(stoiip_cum_img.getvalue()).decode("utf-8")
 
     st.subheader("Recoverable reserves distribution")
     fig2, ax2 = plt.subplots(figsize=(10, 5))
@@ -409,9 +453,21 @@ if run_button:
     ax2.legend()
     st.pyplot(fig2)
 
+    st.subheader("Recoverable reserves cumulative distribution")
+    fig2_cum = create_cumulative_plot(
+        recoverable_mmstb,
+        recoverable_stats,
+        "Recoverable Reserves (MMSTB)",
+        "Cumulative Recoverable Reserves Results",
+    )
+    st.pyplot(fig2_cum)
+
     recoverable_img = io.BytesIO()
     fig2.savefig(recoverable_img, format="png", bbox_inches="tight")
     recoverable_img_b64 = base64.b64encode(recoverable_img.getvalue()).decode("utf-8")
+    recoverable_cum_img = io.BytesIO()
+    fig2_cum.savefig(recoverable_cum_img, format="png", bbox_inches="tight")
+    recoverable_cum_img_b64 = base64.b64encode(recoverable_cum_img.getvalue()).decode("utf-8")
 
     # Sensitivity ranking using rank correlation (Spearman-like via pandas ranks)
     sensitivity_df = pd.DataFrame(
@@ -615,8 +671,16 @@ if run_button:
                     <img src="data:image/png;base64,{stoiip_img_b64}" alt="STOIIP distribution chart" />
                 </div>
                 <div class="chart">
+                    <h3>STOIIP Cumulative Distribution</h3>
+                    <img src="data:image/png;base64,{stoiip_cum_img_b64}" alt="STOIIP cumulative distribution chart" />
+                </div>
+                <div class="chart">
                     <h3>Recoverable Reserves Distribution</h3>
                     <img src="data:image/png;base64,{recoverable_img_b64}" alt="Recoverable reserves distribution chart" />
+                </div>
+                <div class="chart">
+                    <h3>Recoverable Reserves Cumulative Distribution</h3>
+                    <img src="data:image/png;base64,{recoverable_cum_img_b64}" alt="Recoverable reserves cumulative distribution chart" />
                 </div>
                 <div class="chart">
                     <h3>Tornado / Sensitivity Ranking</h3>
@@ -828,8 +892,14 @@ Sensitivity ranking
         story.append(Paragraph("STOIIP distribution", small_style))
         story.append(Image(fig_bytes(fig1), width=170 * mm, height=88 * mm))
         story.append(Spacer(1, 6))
+        story.append(Paragraph("STOIIP cumulative distribution", small_style))
+        story.append(Image(fig_bytes(fig1_cum), width=170 * mm, height=88 * mm))
+        story.append(Spacer(1, 6))
         story.append(Paragraph("Recoverable reserves distribution", small_style))
         story.append(Image(fig_bytes(fig2), width=170 * mm, height=88 * mm))
+        story.append(Spacer(1, 6))
+        story.append(Paragraph("Recoverable reserves cumulative distribution", small_style))
+        story.append(Image(fig_bytes(fig2_cum), width=170 * mm, height=88 * mm))
         story.append(Spacer(1, 6))
         story.append(Paragraph("Tornado / sensitivity ranking", small_style))
         story.append(Image(fig_bytes(fig3), width=160 * mm, height=92 * mm))
